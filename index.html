@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>홈앤 김재식 여기에 잠들다</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap');
+        
+        body {
+            background: linear-gradient(135deg, #a8e063 0%, #56ab2f 100%);
+            font-family: 'Nanum Pen Script', cursive;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* 눈 내리는 애니메이션 */
+        #snow-container {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .snowflake {
+            position: absolute;
+            top: -50px;
+            width: 30px;
+            opacity: 0.8;
+            animation: fall linear infinite;
+        }
+        @keyframes fall {
+            to { transform: translateY(105vh) rotate(360deg); }
+        }
+
+        /* 올리브 모양 메모지 */
+        .olive-note {
+            background-color: #f3f9d2;
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            transition: transform 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border: 2px solid #56ab2f;
+        }
+        .olive-note:hover { transform: scale(1.05) rotate(2deg); }
+
+        /* 비석 팝업 */
+        #tombstone-modal {
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div id="snow-container"></div>
+
+    <div id="tombstone-modal" class="fixed inset-0 transition-opacity">
+        <div class="text-center">
+            <img src="tombstone.png" alt="비석" class="w-64 md:w-80 mx-auto mb-6 animate-bounce">
+            <h1 class="text-4xl text-white mb-8">홈앤 김재식 여기에 잠들다</h1>
+            <button onclick="closeModal()" class="bg-white text-green-700 px-8 py-3 rounded-full text-2xl font-bold hover:bg-green-100 transition">
+                [ 롤링페이퍼 쓰기 ]
+            </button>
+        </div>
+    </div>
+
+    <div class="relative z-10 max-w-4xl mx-auto pt-10">
+        <header class="text-center mb-12">
+            <h2 class="text-6xl text-white drop-shadow-lg">굿바이 재식! 롤링페이퍼</h2>
+        </header>
+
+        <div class="bg-white/90 p-6 rounded-3xl shadow-xl mb-12">
+            <div class="flex flex-col gap-4">
+                <input id="sender" type="text" placeholder="보내는 이" class="text-2xl p-3 border-b-2 border-green-300 outline-none">
+                <textarea id="content" placeholder="재식 님에게 전할 마지막(?) 메시지..." class="text-2xl p-3 border-2 border-green-200 rounded-xl h-32 outline-none focus:border-green-500"></textarea>
+                <button onclick="sendMessage()" id="send-btn" class="bg-green-600 text-white text-3xl py-3 rounded-xl hover:bg-green-700 transition">메시지 안치하기</button>
+            </div>
+        </div>
+
+        <div id="messages-grid" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            </div>
+    </div>
+
+    <script>
+        // --- [ Supabase 설정 ] ---
+        // TODO: 아래 정보를 본인의 Supabase 프로젝트 정보로 교체하세요.
+        const SUPABASE_URL = 'https://zxludvhkfltsaukmajkh.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_ZYenhII2_JvGlRbJIxiUcQ_6G3mzGuY';
+        
+        const supabase = typeof supabase !== 'undefined' 
+            ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+            : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // 팝업 닫기
+        function closeModal() {
+            document.getElementById('tombstone-modal').style.display = 'none';
+            fetchMessages();
+        }
+
+        // 눈 내리는 효과 생성
+        function createSnow() {
+            const container = document.getElementById('snow-container');
+            const count = 30;
+            for (let i = 0; i < count; i++) {
+                const snow = document.createElement('img');
+                snow.src = 'snow.png';
+                snow.className = 'snowflake';
+                snow.style.left = Math.random() * 100 + 'vw';
+                snow.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                snow.style.opacity = Math.random();
+                container.appendChild(snow);
+            }
+        }
+        createSnow();
+
+        // 메시지 불러오기 (최신순 200개)
+        async function fetchMessages() {
+            const { data, error } = await supabase
+                .from('rolling_messages')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(200);
+
+            if (error) console.error('Error:', error);
+            else renderMessages(data);
+        }
+
+        // 메시지 렌더링
+        function renderMessages(messages) {
+            const grid = document.getElementById('messages-grid');
+            grid.innerHTML = messages.map(msg => `
+                <div class="olive-note p-8 flex flex-col justify-center items-center text-center">
+                    <p class="text-3xl mb-4">"${msg.content}"</p>
+                    <p class="text-xl font-bold text-green-800">- ${msg.sender} -</p>
+                    <p class="text-sm text-green-600 mt-2">${new Date(msg.created_at).toLocaleString()}</p>
+                </div>
+            `).join('');
+        }
+
+        // 메시지 전송
+        async function sendMessage() {
+            const sender = document.getElementById('sender').value;
+            const content = document.getElementById('content').value;
+            const btn = document.getElementById('send-btn');
+
+            if (!sender || !content) return alert('내용을 입력해주세요!');
+
+            btn.disabled = true;
+            btn.innerText = '안치 중...';
+
+            const { error } = await supabase
+                .from('rolling_messages')
+                .insert([{ sender, content }]);
+
+            if (error) {
+                alert('전송 실패!');
+            } else {
+                document.getElementById('sender').value = '';
+                document.getElementById('content').value = '';
+                fetchMessages(); // 즉시 새로고침
+            }
+            btn.disabled = false;
+            btn.innerText = '메시지 안치하기';
+        }
+
+        // 초기 데이터 로드
+        window.onload = () => {
+            // 팝업이 닫혀있는 상태로 시작하는 경우를 대비해 미리 로드
+            if(document.getElementById('tombstone-modal').style.display === 'none') {
+                fetchMessages();
+            }
+        };
+    </script>
+</body>
+</html>
