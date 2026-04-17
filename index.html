@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>굿바이 재식! 롤링페이퍼</title>
+    <title>홈앤 김재식 롤링페이퍼</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -17,7 +17,12 @@
         #snow-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
         .snowflake { position: absolute; top: -50px; width: 20px; animation: fall linear infinite; opacity: 0.6; }
         @keyframes fall { to { transform: translateY(105vh) rotate(360deg); } }
-        .olive-note { background-color: #f3f9d2; border-radius: 40% 40% 40% 40% / 60% 60% 40% 40%; border: 2px solid #56ab2f; }
+        .olive-note { 
+            background-color: #f3f9d2; 
+            border-radius: 40% 40% 40% 40% / 60% 60% 40% 40%; 
+            border: 2px solid #56ab2f; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
         .content-box { position: relative; z-index: 10; max-width: 800px; margin: 0 auto; }
     </style>
 </head>
@@ -26,19 +31,22 @@
 
     <div class="content-box">
         <div class="text-center mb-10">
-            <img src="tombstone.png" alt="비석" class="w-32 mx-auto mb-4">
+            <img src="tombstone.png" alt="비석" class="w-32 mx-auto mb-4" onerror="this.style.display='none'">
             <h1 class="text-5xl text-white drop-shadow-lg">홈앤 김재식 여기에 잠들다</h1>
         </div>
 
         <div class="bg-white/90 p-6 rounded-3xl shadow-xl mb-10">
             <div class="flex flex-col gap-4">
-                <input id="sender" type="text" placeholder="이름" class="text-2xl p-2 border-b-2 border-green-300 outline-none">
-                <textarea id="content" placeholder="메시지를 남겨주세요" class="text-2xl p-2 border-2 border-green-100 rounded-xl h-24 outline-none"></textarea>
-                <button onclick="sendMessage()" id="send-btn" class="bg-green-700 text-white text-3xl py-2 rounded-xl">메시지 안치하기</button>
+                <input id="sender" type="text" placeholder="보내는 이" class="text-2xl p-2 border-b-2 border-green-300 outline-none focus:border-green-600">
+                <textarea id="content" placeholder="재식 님에게 전할 메시지..." class="text-2xl p-2 border-2 border-green-100 rounded-xl h-24 outline-none focus:border-green-400"></textarea>
+                <button onclick="sendMessage()" id="send-btn" class="bg-green-700 text-white text-3xl py-2 rounded-xl active:scale-95 transition">메시지 안치하기</button>
             </div>
         </div>
 
-        <div id="messages-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+        <h2 class="text-3xl text-white mb-4">현재까지 안치된 메시지</h2>
+        <div id="messages-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <p class="text-white text-2xl col-span-full text-center opacity-70">메시지를 불러오고 있습니다...</p>
+        </div>
     </div>
 
        <script>
@@ -47,39 +55,84 @@
         const SUPABASE_URL = 'https://zxludvhkfltsaukmajkh.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_ZYenhII2_JvGlRbJIxiUcQ_6G3mzGuY';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      
 
+        // 1. 메시지 불러오기 함수
         async function fetchMessages() {
-            const { data, error } = await supabase.from('rolling_messages').select('*').order('created_at', { ascending: false });
-            if (!error) {
-                const grid = document.getElementById('messages-grid');
+            const grid = document.getElementById('messages-grid');
+            const { data, error } = await supabase
+                .from('rolling_messages')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('불러오기 에러:', error);
+                grid.innerHTML = `<p class="text-red-200 text-2xl col-span-full text-center">데이터를 불러오지 못했습니다.</p>`;
+                return;
+            }
+
+            if (data.length === 0) {
+                grid.innerHTML = `<p class="text-white text-2xl col-span-full text-center opacity-70">아직 메시지가 없습니다. 첫 메시지를 남겨주세요!</p>`;
+            } else {
                 grid.innerHTML = data.map(msg => `
                     <div class="olive-note p-6 text-center">
-                        <p class="text-2xl mb-2">"${msg.content}"</p>
-                        <p class="text-xl font-bold text-green-800">- ${msg.sender}</p>
+                        <p class="text-2xl mb-2 text-green-900 font-bold">"${msg.content}"</p>
+                        <p class="text-xl text-green-700">- ${msg.sender} 님</p>
                     </div>
                 `).join('');
             }
         }
 
+        // 2. 메시지 보내기 함수
         async function sendMessage() {
             const s = document.getElementById('sender');
             const c = document.getElementById('content');
-            if (!s.value || !c.value) return alert('내용을 입력해주세요');
-            const { error } = await supabase.from('rolling_messages').insert([{ sender: s.value, content: c.value }]);
-            if (!error) { s.value = ''; c.value = ''; fetchMessages(); }
+            const btn = document.getElementById('send-btn');
+
+            if (!s.value || !c.value) {
+                alert('이름과 내용을 모두 입력해주세요!');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerText = '저장 중...';
+
+            const { error } = await supabase
+                .from('rolling_messages')
+                .insert([{ sender: s.value, content: c.value }]);
+
+            if (error) {
+                alert('저장에 실패했습니다: ' + error.message);
+            } else {
+                s.value = '';
+                c.value = '';
+                // 중요: 저장 성공 후 1초 뒤에 목록 다시 불러오기 (DB 반영 시간 고려)
+                setTimeout(fetchMessages, 500); 
+            }
+            btn.disabled = false;
+            btn.innerText = '메시지 안치하기';
         }
 
-        // 눈 내리는 효과
-        for (let i = 0; i < 20; i++) {
-            const snow = document.createElement('img');
-            snow.src = 'snow.png';
-            snow.className = 'snowflake';
-            snow.style.left = Math.random() * 100 + 'vw';
-            snow.style.animationDuration = (Math.random() * 3 + 2) + 's';
-            document.getElementById('snow-container').appendChild(snow);
+        // 3. 눈 내리는 효과 (이미지 없어도 에러 안 나게 처리)
+        function makeSnow() {
+            const container = document.getElementById('snow-container');
+            for (let i = 0; i < 20; i++) {
+                const snow = document.createElement('img');
+                snow.src = 'snow.png';
+                snow.className = 'snowflake';
+                snow.style.left = Math.random() * 100 + 'vw';
+                snow.style.animationDuration = (Math.random() * 3 + 3) + 's';
+                snow.style.animationDelay = Math.random() * 5 + 's';
+                snow.onerror = () => snow.style.display = 'none'; // 이미지 없으면 자동 숨김
+                container.appendChild(snow);
+            }
         }
 
-        window.onload = fetchMessages;
+        // 시작 시 실행
+        window.onload = () => {
+            makeSnow();
+            fetchMessages();
+        };
     </script>
 </body>
 </html>
